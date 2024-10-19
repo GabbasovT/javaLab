@@ -1,0 +1,4 @@
+#!/bin/bash
+javac Reverse.java
+javac ReverseMaxAbsModOctDec.java
+java -ea -jar FastReverseTest.jar MaxAbsModOctDec
