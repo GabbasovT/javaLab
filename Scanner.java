@@ -3,26 +3,20 @@ import java.io.Reader;
 import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.io.StringReader;
-import java.util.NoSuchElementException;
 import java.nio.charset.StandardCharsets;
+import java.util.NoSuchElementException;
 
-public class Scanner implements AutoCloseable {
+public class Scanner {
     private static final int BUFFER_SIZE = 1024;
     private Reader reader;
     private char[] buffer;
     private int bufferSize;
-    private int positionBuffer;
-    private int positionBuilder;
-    private boolean isEOF;
+    private int positionInBuffer;
+    private int positionInBuilder;
+    private int tokenStarts;
     private StringBuilder builder;
     private String lineSeparator;
-    private int sepLength;
-
-    public Scanner(String inputStream) {
-        this.reader = new StringReader(inputStream);
-        this.lineSeparator = System.lineSeparator();
-        initialize();
-    }
+    private int separatorLength;
 
     public Scanner(InputStream inputStream) {
         this.reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
@@ -30,85 +24,81 @@ public class Scanner implements AutoCloseable {
         initialize();
     }
 
+    public Scanner(String inputStream) {
+        this.reader = new StringReader(inputStream);
+        this.lineSeparator = System.lineSeparator();
+        initialize();
+    }
+
     private void initialize() {
-        isEOF = false;
         builder = new StringBuilder();
         buffer = new char[BUFFER_SIZE];
         bufferSize = 0;
-        positionBuffer = 0;
-        positionBuilder = 0;
-        sepLength = lineSeparator.length();
+        positionInBuffer = 0;
+        positionInBuilder = 0;
+        tokenStarts = 0;
+        separatorLength = lineSeparator.length();
         fillBuffer();
     }
 
     private void fillBuffer() {
-        if (positionBuffer < bufferSize) {
+        if (positionInBuffer < bufferSize) {
             return;
         }
         try {
             bufferSize = reader.read(buffer);
-            positionBuffer = 0;
-            isEOF = (bufferSize == -1);
+            positionInBuffer = 0;
         } catch (IOException e) {
             throw new RuntimeException("Exception reading from Reader", e);
         }
     }
 
-    public void resetBuilder() {
-        if (positionBuilder == builder.length()) {
-            builder.setLength(0);
-            positionBuilder = 0;
-        }
+    private void resetBuilder() {
+        builder.setLength(0);
+        positionInBuilder = 0;
+        tokenStarts = 0;
     }
 
     private boolean hasNextChar() {
-        if (isEOF) {
-            return false;
-        }
         fillBuffer();
-        return bufferSize > positionBuffer;
+        return positionInBuffer < bufferSize;
     }
 
     private char nextChar() {
         if (!hasNextChar()) {
             throw new NoSuchElementException("No more chars");
         }
+
         fillBuffer();
-        if (sepLength == 2) {
-            if (buffer[positionBuffer] == '\r') {
-                positionBuffer++;
-                return nextChar();
-            }
-        }
-        return buffer[positionBuffer++];
+        return buffer[positionInBuffer++];
     }
 
     private StringBuilder getToken() {
         StringBuilder token = new StringBuilder();
-        for (; positionBuilder < builder.length(); positionBuilder++) {
-            char c = builder.charAt(positionBuilder);
-            if (!Character.isWhitespace(c)) {
-                token.append(c);
+        for (; tokenStarts < builder.length(); tokenStarts++) {
+            char c = builder.charAt(tokenStarts);
+            if (Character.isWhitespace(c)) {
+                resetBuilder();
+                builder.append(c);
+                return token;
             }
+            token.append(c);
         }
-        char c = builder.charAt(builder.length() - 1);
-        resetBuilder();
-        if (Character.isWhitespace(c)) {
-            builder.append(c);
+        while (hasNextChar()) {
+            char c = nextChar();
+            if (Character.isWhitespace(c)) {
+                resetBuilder();
+                builder.append(c);
+                return token;
+            }
+            token.append(c);
         }
         return token;
     }
 
     public boolean hasNextLine() {
-        if (positionBuilder < builder.length()) {
-            return true;
-        }
-        if (isEOF && builder.length() == 0) {
-            return false;
-        }
         fillBuffer();
-
-        return bufferSize > 0 || builder.length() > 0;
+        return (positionInBuffer < bufferSize || positionInBuilder < builder.length());
     }
 
     public String nextLine() {
@@ -116,45 +106,49 @@ public class Scanner implements AutoCloseable {
             throw new NoSuchElementException("No more lines");
         }
         StringBuilder line = new StringBuilder();
-        for (; positionBuilder < builder.length(); positionBuilder++) {
-            char c = builder.charAt(positionBuilder);
+        for (; positionInBuilder < builder.length(); positionInBuilder++) {
+            char c = builder.charAt(positionInBuilder);
             line.append(c);
-            if (c == '\n' || c == '\r') {
-                positionBuilder++;
-                resetBuilder();
-                return line.toString();
+            if (line.length() >= separatorLength) {
+                if (lineSeparator.equals(line.substring(line.length() - separatorLength))) {
+                    positionInBuilder++;
+                    if (positionInBuilder == builder.length()) {
+                        positionInBuilder = 0;
+                        builder.setLength(0);
+                        tokenStarts = 0;
+                    }
+                    return line.toString();
+                }
             }
         }
         resetBuilder();
         while (hasNextChar()) {
             char c = nextChar();
             line.append(c);
-            if (c == '\n' || c == '\r') {
-                break;
+            if (line.length() >= separatorLength) {
+                if (lineSeparator.equals(line.substring(line.length() - separatorLength))) {
+                    break;
+                }
             }
         }
         return line.toString();
     }
 
     public boolean hasNext() {
-        if (builder.length() > 1) {
-            return true;
+        for (; tokenStarts < builder.length(); tokenStarts++) {
+            if (!Character.isWhitespace(builder.charAt(tokenStarts))) {
+                return true;
+            }
         }
-        if (isEOF) {
-            return false;
-        }
-        boolean wordEnds = false;
         while (hasNextChar()) {
             char c = nextChar();
             builder.append(c);
-            if (Character.isWhitespace(c) && wordEnds) {
+            if (!Character.isWhitespace(c)) {
+                tokenStarts = builder.length() - 1;
                 return true;
             }
-            if (!Character.isWhitespace(c)) {
-                wordEnds = true;
-            }
         }
-        return wordEnds;
+        return false;
     }
 
     public String next() {
@@ -170,15 +164,26 @@ public class Scanner implements AutoCloseable {
             return false;
         }
         StringBuilder str = new StringBuilder();
-        for (int i = positionBuilder; i < builder.length(); i++) {
+        for (int i = tokenStarts; i < builder.length(); i++) {
             char c = builder.charAt(i);
-            if (!Character.isWhitespace(c)) {
-                str.append(c);
+            if (Character.isWhitespace(c)) {
+                break;
+            }
+            str.append(c);
+            if (i == builder.length() - 1) {
+                while (hasNextChar()) {
+                    char v = nextChar();
+                    builder.append(v);
+                    if (Character.isWhitespace(v)) {
+                        break;
+                    }
+                    str.append(v);
+                }
+                break;
             }
         }
 
         String s = str.toString();
-
         try {
             Integer.parseInt(s);
         } catch (NumberFormatException e) {
@@ -200,8 +205,7 @@ public class Scanner implements AutoCloseable {
             throw new NoSuchElementException("No more ints");
         }
 
-        StringBuilder str = getToken();
-        String s = str.toString();
+        String s = getToken().toString();
 
         try {
             return Integer.parseInt(s);
@@ -216,6 +220,19 @@ public class Scanner implements AutoCloseable {
                 throw new NumberFormatException("Invalid octal format: " + s);
             }
         }
+    }
+
+    public boolean hasNextIntInLine() {
+        if (!hasNextInt()) {
+            return false;
+        }
+        for (int i = positionInBuilder; i < tokenStarts; i++) {
+            if (i - positionInBuilder + 1 >= separatorLength
+                    && lineSeparator.equals(builder.substring(i - separatorLength + 1, i + 1))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void close() {

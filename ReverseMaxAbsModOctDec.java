@@ -20,15 +20,14 @@ public class ReverseMaxAbsModOctDec {
         while (input.hasNextLine()) {
             int[] vector = new int[1];
             int currentNumber = 0;
-            String line = input.nextLine();
-            Scanner lineScanner = new Scanner(line);
-            while (lineScanner.hasNextInt()) {
+
+            while (input.hasNextIntInLine()) {
                 if (currentNumber == vector.length) {
                     vector = Arrays.copyOf(vector, 2 * vector.length);
                 }
-                vector[currentNumber++] = lineScanner.nextInt();
+                vector[currentNumber++] = input.nextInt();
             }
-            lineScanner.close();
+            input.nextLine();
             vector = Arrays.copyOf(vector, currentNumber);
             if (currentString == matrix.length) {
                 matrix = Arrays.copyOf(matrix, 2 * matrix.length);
