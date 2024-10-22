@@ -14,9 +14,8 @@ public class WsppEvenCurrency {
             return;
         }
         word = word.toLowerCase();
-        IntList positions = wordCount.getOrDefault(word, new IntList());
+        IntList positions = wordCount.computeIfAbsent(word, k -> new IntList());
         positions.updateLast(numberOfString, wordPosition, word);
-        wordCount.put(word, positions);
     }
 
     public static void main(String[] args) {
@@ -24,10 +23,12 @@ public class WsppEvenCurrency {
             System.err.println("Error: Input and output files must be specified.");
             return;
         }
+
         Map<String, IntList> wordCount = new LinkedHashMap<>();
         WhitespaceChecker customChecker = new WsppEvenCurrencyWhiteSpacesCheck();
 
         try (Scanner input = new Scanner(new FileInputStream(args[0]), customChecker)) {
+
             int currentString = 1;
             while (input.hasNextLine()) {
                 int wordIndex = 0;
@@ -41,12 +42,14 @@ public class WsppEvenCurrency {
                 input.nextLine();
                 currentString++;
             }
+
         } catch (IOException e) {
             System.err.println("Error reading input file: " + e.getMessage());
         }
 
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(args[1]), StandardCharsets.UTF_8))) {
+
             for (Map.Entry<String, IntList> entry : wordCount.entrySet()) {
                 String word = entry.getKey();
                 IntList positions = entry.getValue();
@@ -56,6 +59,7 @@ public class WsppEvenCurrency {
                 }
                 writer.newLine();
             }
+
         } catch (IOException e) {
             System.err.println("Error writing output file: " + e.getMessage());
         }
