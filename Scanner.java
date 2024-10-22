@@ -1,12 +1,8 @@
-import java.io.IOException;
-import java.io.Reader;
-import java.io.InputStreamReader;
-import java.io.InputStream;
-import java.io.StringReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 
-public class Scanner {
+public class Scanner implements AutoCloseable {
     private static final int BUFFER_SIZE = 1024;
     private Reader reader;
     private char[] buffer;
@@ -17,16 +13,19 @@ public class Scanner {
     private StringBuilder builder;
     private String lineSeparator;
     private int separatorLength;
+    private WhitespaceChecker whitespaceChecker;
 
-    public Scanner(InputStream inputStream) {
+    public Scanner(InputStream inputStream, WhitespaceChecker whitespaceChecker) {
         this.reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
         this.lineSeparator = System.lineSeparator();
+        this.whitespaceChecker = whitespaceChecker;
         initialize();
     }
 
-    public Scanner(String inputStream) {
+    public Scanner(String inputStream, WhitespaceChecker whitespaceChecker) {
         this.reader = new StringReader(inputStream);
         this.lineSeparator = System.lineSeparator();
+        this.whitespaceChecker = whitespaceChecker;
         initialize();
     }
 
@@ -77,7 +76,7 @@ public class Scanner {
         StringBuilder token = new StringBuilder();
         for (; tokenStarts < builder.length(); tokenStarts++) {
             char c = builder.charAt(tokenStarts);
-            if (Character.isWhitespace(c)) {
+            if (whitespaceChecker.isWhitespace(c)) {
                 resetBuilder();
                 builder.append(c);
                 return token;
@@ -86,7 +85,7 @@ public class Scanner {
         }
         while (hasNextChar()) {
             char c = nextChar();
-            if (Character.isWhitespace(c)) {
+            if (whitespaceChecker.isWhitespace(c)) {
                 resetBuilder();
                 builder.append(c);
                 return token;
@@ -136,20 +135,21 @@ public class Scanner {
 
     public boolean hasNext() {
         for (; tokenStarts < builder.length(); tokenStarts++) {
-            if (!Character.isWhitespace(builder.charAt(tokenStarts))) {
+            if (!whitespaceChecker.isWhitespace(builder.charAt(tokenStarts))) { // Use custom checker here
                 return true;
             }
         }
         while (hasNextChar()) {
             char c = nextChar();
             builder.append(c);
-            if (!Character.isWhitespace(c)) {
+            if (!whitespaceChecker.isWhitespace(c)) { // Use custom checker here
                 tokenStarts = builder.length() - 1;
                 return true;
             }
         }
         return false;
     }
+
 
     public String next() {
         if (!hasNextLine()) {
@@ -166,7 +166,7 @@ public class Scanner {
         StringBuilder str = new StringBuilder();
         for (int i = tokenStarts; i < builder.length(); i++) {
             char c = builder.charAt(i);
-            if (Character.isWhitespace(c)) {
+            if (whitespaceChecker.isWhitespace(c)) {
                 break;
             }
             str.append(c);
@@ -174,7 +174,7 @@ public class Scanner {
                 while (hasNextChar()) {
                     char v = nextChar();
                     builder.append(v);
-                    if (Character.isWhitespace(v)) {
+                    if (whitespaceChecker.isWhitespace(v)) {
                         break;
                     }
                     str.append(v);
@@ -182,7 +182,6 @@ public class Scanner {
                 break;
             }
         }
-
         String s = str.toString();
         try {
             Integer.parseInt(s);
@@ -224,6 +223,19 @@ public class Scanner {
 
     public boolean hasNextIntInLine() {
         if (!hasNextInt()) {
+            return false;
+        }
+        for (int i = positionInBuilder; i < tokenStarts; i++) {
+            if (i - positionInBuilder + 1 >= separatorLength
+                    && lineSeparator.equals(builder.substring(i - separatorLength + 1, i + 1))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean hasNextInLine() {
+        if (!hasNext()) {
             return false;
         }
         for (int i = positionInBuilder; i < tokenStarts; i++) {

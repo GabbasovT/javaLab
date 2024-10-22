@@ -4,7 +4,8 @@ import java.util.ArrayList;
 public class Reverse {
     public static void main(String[] args) {
         ArrayList<int[]> matrix = new ArrayList<>();
-        Scanner input = new Scanner(System.in);
+        WhitespaceChecker customChecker = new ReverseWhiteSpacesCheck();
+        Scanner input = new Scanner(System.in, customChecker);
 
         while (input.hasNextLine()) {
             String line = input.nextLine();

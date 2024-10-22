@@ -14,7 +14,8 @@ public class ReverseMaxAbsModOctDec {
 
     public static void main(String[] args) {
         int[][] matrix = new int[1][0];
-        Scanner input = new Scanner(System.in);
+        WhitespaceChecker customChecker = new ReverseWhiteSpacesCheck();
+        Scanner input = new Scanner(System.in, customChecker);
         int currentString = 0;
 
         while (input.hasNextLine()) {

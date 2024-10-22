@@ -1,0 +1,4 @@
+#!/bin/bash
+javac Wspp.java
+javac WsppEvenCurrency.java
+java -ea -jar WsppTest.jar EvenCurrency
